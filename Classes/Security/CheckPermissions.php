@@ -157,28 +157,27 @@ class CheckPermissions implements \TYPO3\CMS\Core\SingletonInterface
         $currentPermissionsCheck = $resource->getStorage()->getEvaluatePermissions();
         $resource->getStorage()->setEvaluatePermissions(false);
 
-        $feGroups = array();
-        // loop trough the root line of an folder and check the permissions of every folder
+        // If the file has fe_groups set itself, only this groups needs to be respected
+        if ($resource instanceof File && $resource->getProperty('fe_groups')) {
+            return $resource->getProperty('fe_groups');
+        }
+
+        // Check all folders, starting with the closest one. The permissions of the first
+        // folder in the rootline need to be respected
+        $feGroups = '';
         foreach ($this->getFolderRootLine($resource->getParentFolder()) as $folder) {
             // fetch folder permissions record
             $folderRecord = $this->utilityService->getFolderRecord($folder);
-
             // if record found check permissions
             if ($folderRecord) {
-                if ($feGroups === array()) {
-                    $feGroups = GeneralUtility::trimExplode(',', $folderRecord['fe_groups'], true);
+                if (!empty($folderRecord['fe_groups'])) {
+                    $feGroups = $folderRecord['fe_groups'];
+                    break;
                 }
-                if ($folderRecord['fe_groups']) {
-                    $feGroups = GeneralUtility::keepItemsInArray($feGroups, $folderRecord['fe_groups']);
-                }
-                break;
             }
         }
-        if ($resource instanceof File && $resource->getProperty('fe_groups')) {
-            $feGroups = GeneralUtility::keepItemsInArray($feGroups, $resource->getProperty('fe_groups'));
-        }
         $resource->getStorage()->setEvaluatePermissions($currentPermissionsCheck);
-        return implode(',', $feGroups);
+        return $feGroups;
     }
 
     /**
@@ -201,7 +200,7 @@ class CheckPermissions implements \TYPO3\CMS\Core\SingletonInterface
             $folder = $parentFolder;
             $parentFolder = $parentFolder->getParentFolder();
         }
-        return array_reverse($rootLine);
+        return $rootLine;
     }
 
     /**
